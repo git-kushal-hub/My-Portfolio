@@ -4,7 +4,7 @@ import {
   Linkedin, Mail, Briefcase, Calculator, TrendingUp, ShieldCheck,
   ChevronRight, ArrowUpRight, FileText, Sparkles, Search, MessageSquare, 
   Zap, X, Scale, Landmark, Coins, Receipt, UserCheck, Volume2, 
-  BrainCircuit, Loader2, Coffee, Users, User 
+  BrainCircuit, Loader2, Coffee, Users, User, BookOpen
 } from 'lucide-react';
 
 // --- Configuration ---
@@ -17,13 +17,25 @@ const App = () => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [scrolled, setScrolled] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
+  
+  // Chat State
   const [aiQuery, setAiQuery] = useState("");
   const [aiResponse, setAiResponse] = useState(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  
+  // TTS State
   const [isTtsLoading, setIsTtsLoading] = useState(false);
+  
+  // Roadmap State
   const [roadmapGoal, setRoadmapGoal] = useState("");
   const [generatedRoadmap, setGeneratedRoadmap] = useState(null);
   const [isRoadmapLoading, setIsRoadmapLoading] = useState(false);
+
+  // Jargon Buster State (New Feature)
+  const [jargonTerm, setJargonTerm] = useState("");
+  const [jargonDefinition, setJargonDefinition] = useState(null);
+  const [isJargonLoading, setIsJargonLoading] = useState(false);
+
   const [imgError, setImgError] = useState(false);
 
   const { scrollYProgress } = useScroll();
@@ -187,6 +199,21 @@ const App = () => {
     } catch (e) {
       setAiResponse("I'm having trouble with the connection. Please reach out to me directly at mail@kushalpoudel.com!");
     } finally { setIsAiLoading(false); }
+  };
+
+  const handleJargonAction = async () => {
+    if (!jargonTerm || isJargonLoading) return;
+    setIsJargonLoading(true);
+    try {
+      const payload = {
+        prompt: `Define: ${jargonTerm}`,
+        systemInstruction: "You are Kushal Poudel. Explain this financial term in 1-2 simple, reassuring sentences for a non-expert. Avoid jargon in your explanation."
+      };
+      const text = await fetchAiContent(payload);
+      setJargonDefinition(text);
+    } catch (e) {
+      setJargonDefinition("I can't pull that definition right now, but I'd be happy to explain it over a call!");
+    } finally { setIsJargonLoading(false); }
   };
 
   useEffect(() => {
@@ -363,6 +390,42 @@ const App = () => {
               <p className="text-slate-400 text-sm leading-relaxed font-light">{skill.d}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* NEW FEATURE: Fiscal Translator */}
+      <section className="py-24 sm:py-40 px-6 sm:px-8 max-w-[1400px] mx-auto border-t border-white/5">
+        <div className="bg-slate-900/40 border border-emerald-500/20 rounded-[3rem] p-8 md:p-16 text-center max-w-4xl mx-auto shadow-2xl">
+          <div className="flex justify-center mb-8"><div className="p-4 bg-emerald-500/10 rounded-2xl"><BookOpen size={40} className="text-emerald-500" /></div></div>
+          <h2 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.5em] mb-6">Fiscal Translator</h2>
+          <h3 className="text-3xl sm:text-5xl font-black mb-8 text-white">Stumped by Jargon?</h3>
+          <p className="text-slate-400 mb-10 text-lg">Type a confusing financial term (like "EBITDA" or "Amortization"), and I'll explain it in plain English.</p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 max-w-xl mx-auto mb-10">
+            <input 
+              type="text" 
+              placeholder="e.g. Depreciation" 
+              className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-emerald-500 transition-all text-white placeholder:text-gray-600" 
+              value={jargonTerm}
+              onChange={(e) => setJargonTerm(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleJargonAction()}
+            />
+            <button 
+              onClick={handleJargonAction} 
+              className="bg-emerald-600 text-white font-black py-4 px-8 rounded-2xl hover:bg-emerald-500 shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"
+            >
+              {isJargonLoading ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />} ✨ Translate
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {jargonDefinition && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="bg-emerald-950/30 border border-emerald-500/30 p-8 rounded-3xl text-left">
+                <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Kushal's Definition:</div>
+                <p className="text-white text-lg font-light italic leading-relaxed">"{jargonDefinition}"</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </section>
 
