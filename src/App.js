@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 
 // --- Gemini API Configuration ---
-const apiKey = "AIzaSyBKPcRzXhNrcTLHTR3ucLUVOtW7SrN2IQQ"; 
+const apiKey = ""; 
 const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
 const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
