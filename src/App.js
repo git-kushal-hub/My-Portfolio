@@ -31,9 +31,9 @@ import {
 } from 'lucide-react';
 
 // --- Gemini API Configuration ---
-// Always set apiKey to an empty string in this environment.
-// The execution environment provides the key at runtime.
-const apiKey = ""; 
+// This safely checks for your Vercel environment variable without crashing the browser.
+// If you are testing locally or on GitHub, it defaults to an empty string.
+const apiKey = (typeof process !== 'undefined' && process.env.REACT_APP_GEMINI_API_KEY) || ""; 
 const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
 const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
@@ -80,6 +80,9 @@ const App = () => {
   };
 
   const callGemini = async (prompt, systemInstruction, retryCount = 0) => {
+    // If the key is missing, don't even try the request
+    if (!apiKey) throw new Error("API_KEY_MISSING");
+
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey}`, {
         method: 'POST',
@@ -89,17 +92,18 @@ const App = () => {
           systemInstruction: { parts: [{ text: systemInstruction }] }
         })
       });
+      
       if (!response.ok) {
         if (retryCount < 5) {
           await sleep(Math.pow(2, retryCount) * 1000);
           return callGemini(prompt, systemInstruction, retryCount + 1);
         }
-        throw new Error("Connection lost.");
+        throw new Error("Connection failed.");
       }
       const data = await response.json();
       return data.candidates?.[0]?.content?.parts?.[0]?.text;
     } catch (error) {
-      if (retryCount < 5) {
+      if (error.message !== "API_KEY_MISSING" && retryCount < 5) {
         await sleep(Math.pow(2, retryCount) * 1000);
         return callGemini(prompt, systemInstruction, retryCount + 1);
       }
@@ -108,7 +112,7 @@ const App = () => {
   };
 
   const handleTts = async (textToSpeak) => {
-    if (isTtsLoading) return;
+    if (isTtsLoading || !apiKey) return;
     setIsTtsLoading(true);
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`, {
@@ -119,8 +123,7 @@ const App = () => {
           generationConfig: {
             responseModalities: ["AUDIO"],
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
-          },
-          model: TTS_MODEL
+          }
         })
       });
       if (!response.ok) throw new Error("TTS failed");
@@ -169,6 +172,12 @@ const App = () => {
       setGeneratedRoadmap(JSON.parse(data.candidates[0].content.parts[0].text));
     } catch (e) {
       console.error(e);
+      setGeneratedRoadmap({
+        step1: "Connection to AI Strategist failed.",
+        step2: "Please verify your API settings.",
+        step3: "Alternatively, reach out to me directly.",
+        step4: "Email: mail@kushalpoudel.com"
+      });
     } finally {
       setIsRoadmapLoading(false);
     }
@@ -182,7 +191,7 @@ const App = () => {
       const response = await callGemini(aiQuery, systemPrompt);
       setAiResponse(response);
     } catch (e) {
-      setAiResponse("I'm having a bit of a technical glitch. Please send me a note at mail@kushalpoudel.com—I'd love to help you personally.");
+      setAiResponse("I'm having a little trouble with the connection here. Why don't you send me a quick note at mail@kushalpoudel.com? I'd love to help you out directly.");
     } finally {
       setIsAiLoading(false);
     }
@@ -223,7 +232,6 @@ const App = () => {
     <div className="bg-[#020617] text-white min-h-screen font-sans selection:bg-emerald-500/30 overflow-x-hidden" style={{ colorScheme: 'dark' }}>
       <motion.div className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-amber-500 to-emerald-600 origin-left z-[110]" style={{ scaleX }} />
 
-      {/* Command K Modal (AI Chat) */}
       <AnimatePresence>
         {isCommandOpen && (
           <motion.div 
