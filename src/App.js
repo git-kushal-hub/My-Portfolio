@@ -7,26 +7,6 @@ import {
   BrainCircuit, Loader2, Coffee, Users, User 
 } from 'lucide-react';
 
-// --- Gemini API Configuration ---
-// Bulletproof check for Vercel Environment Variables to prevent mobile crashes
-const getSafeApiKey = () => {
-  try {
-    if (typeof window !== 'undefined' && window.process?.env?.REACT_APP_GEMINI_API_KEY) {
-      return window.process.env.REACT_APP_GEMINI_API_KEY;
-    }
-    if (typeof process !== 'undefined' && process?.env?.REACT_APP_GEMINI_API_KEY) {
-      return process.env.REACT_APP_GEMINI_API_KEY;
-    }
-  } catch (e) {
-    console.error("API Key retrieval failed:", e);
-  }
-  return ""; 
-};
-
-const apiKey = getSafeApiKey();
-const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
-const TTS_MODEL = "gemini-2.5-flash-preview-tts";
-
 const App = () => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [scrolled, setScrolled] = useState(false);
@@ -43,8 +23,7 @@ const App = () => {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
 
-  const sleep = (ms) => new Promise(res => setTimeout(res, ms));
-
+  // PCM to WAV conversion helper
   const createWavUrl = (base64Pcm, sampleRate = 24000) => {
     const pcmData = Uint8Array.from(atob(base64Pcm), c => c.charCodeAt(0));
     const wavHeader = new ArrayBuffer(44);
@@ -69,72 +48,64 @@ const App = () => {
     return URL.createObjectURL(blob);
   };
 
-  const callGemini = async (prompt, systemInstruction) => {
-    if (!apiKey) return "My AI features are currently verifying the secure connection. Please email me at mail@kushalpoudel.com for immediate help!";
+  const handleTts = async (textToSpeak) => {
+    if (isTtsLoading) return;
+    setIsTtsLoading(true);
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey}`, {
+      const response = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          systemInstruction: { parts: [{ text: systemInstruction }] }
-        })
+        body: JSON.stringify({ text: textToSpeak })
       });
-      if (!response.ok) throw new Error();
       const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text;
-    } catch (error) {
-      return "I'm having a slight connection issue with the AI. Let's chat directly: mail@kushalpoudel.com";
+      if (data.audio) {
+        const audio = new Audio(createWavUrl(data.audio));
+        audio.play();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsTtsLoading(false);
     }
   };
 
-  const handleTts = async (textToSpeak) => {
-    if (isTtsLoading || !apiKey) return;
-    setIsTtsLoading(true);
+  const generateRoadmapAction = async () => {
+    if (!roadmapGoal || isRoadmapLoading) return;
+    setIsRoadmapLoading(true);
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`, {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `Say in a warm, professional tone: ${textToSpeak}` }] }],
-          generationConfig: {
-            responseModalities: ["AUDIO"],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
-          }
+        body: JSON.stringify({ 
+          prompt: `Goal: ${roadmapGoal}`, 
+          systemInstruction: "You are Kushal Poudel. Generate a 4-step financial roadmap in JSON format with properties step1, step2, step3, step4.",
+          isJson: true 
         })
       });
       const data = await response.json();
-      const base64Audio = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Audio) new Audio(createWavUrl(base64Audio)).play();
-    } catch (e) {} finally { setIsTtsLoading(false); }
-  };
-
-  const generateRoadmapAction = async () => {
-    if (!roadmapGoal || isRoadmapLoading || !apiKey) return;
-    setIsRoadmapLoading(true);
-    try {
-      const result = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `Goal: ${roadmapGoal}` }] }],
-          systemInstruction: { parts: [{ text: "You are Kushal Poudel. Generate a 4-step financial roadmap in JSON format with properties step1, step2, step3, step4." }] },
-          generationConfig: { responseMimeType: "application/json" }
-        })
-      });
-      const data = await result.json();
-      setGeneratedRoadmap(JSON.parse(data.candidates[0].content.parts[0].text));
+      setGeneratedRoadmap(JSON.parse(data.text));
     } catch (e) {
-      setGeneratedRoadmap({ step1: "Strategist offline.", step2: "I can still help personally.", step3: "Email: mail@kushalpoudel.com", step4: "Let's build your path together." });
+      setGeneratedRoadmap({ step1: "Strategist offline.", step2: "I'd love to help personally.", step3: "Email: mail@kushalpoudel.com", step4: "Let's build your path." });
     } finally { setIsRoadmapLoading(false); }
   };
 
   const handleAiQuery = async () => {
     if (!aiQuery || isAiLoading) return;
     setIsAiLoading(true);
-    const res = await callGemini(aiQuery, "You are Kushal Poudel, a financial partner. Respond warmly and concisely.");
-    setAiResponse(res);
-    setIsAiLoading(false);
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          prompt: aiQuery, 
+          systemInstruction: "You are Kushal Poudel, a financial partner. Respond warmly and concisely." 
+        })
+      });
+      const data = await response.json();
+      setAiResponse(data.text);
+    } catch (e) {
+      setAiResponse("Connection issue. Let's chat: mail@kushalpoudel.com");
+    } finally { setIsAiLoading(false); }
   };
 
   useEffect(() => {
@@ -179,7 +150,7 @@ const App = () => {
                   <div className="flex flex-col gap-4 opacity-20">
                     <div className="h-4 w-3/4 bg-white/10 rounded"></div>
                     <div className="h-4 w-1/2 bg-white/10 rounded"></div>
-                    <div className="mt-8 text-[10px] font-black uppercase tracking-[0.5em] text-center w-full italic text-white/50">Fiscal Command Center</div>
+                    <div className="mt-8 text-[10px] font-black uppercase tracking-[0.5em] text-center w-full italic text-white/50 text-center">Fiscal Command Center</div>
                   </div>
                 )}
               </div>
@@ -202,7 +173,6 @@ const App = () => {
         </div>
       </nav>
 
-      {/* Hero Section */}
       <section className="relative pt-32 pb-20 px-6 sm:px-8 min-h-screen flex flex-col justify-center z-10 max-w-[1400px] mx-auto text-left">
         <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-12 items-center">
           <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 1 }}>
@@ -214,13 +184,8 @@ const App = () => {
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-amber-500 to-yellow-600 italic">MY PRIORITY.</span>
             </h1>
 
-            {/* Mobile/Tablet Image - Visible only below Desktop break (lg) */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              transition={{ duration: 1, delay: 0.5 }} 
-              className="lg:hidden mb-10 relative w-full"
-            >
+            {/* Mobile/Tablet Image */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.5 }} className="lg:hidden mb-10 relative w-full">
               <div className="absolute inset-0 bg-emerald-500/10 blur-[60px] rounded-full"></div>
               <div className="relative aspect-[16/9] rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl bg-slate-900/50 backdrop-blur-3xl">
                  {!imgError ? (
@@ -236,7 +201,7 @@ const App = () => {
               "I know how heavy the weight of financial stress can feel. I handle the spreadsheets so you can focus on building your legacy."
             </p>
             <div className="flex flex-wrap gap-4">
-               <button onClick={() => handleTts("I know how heavy financial stress can feel. I am Kushal Poudel, and I am here to help. Let's build your future together.")} className="px-6 py-4 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition-all group active:scale-95">
+               <button onClick={() => handleTts("I know how heavy financial stress can feel. I am Kushal Poudel, and I am here to help. Let's build your future together.")} className="px-6 py-4 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition-all group active:scale-95 shadow-xl">
                   {isTtsLoading ? <Loader2 size={16} className="animate-spin" /> : <Volume2 size={16} className="text-emerald-500" />}
                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-white">Listen to Message</span>
                </button>
@@ -244,13 +209,8 @@ const App = () => {
             </div>
           </motion.div>
 
-          {/* Desktop Image - Visible only on LG and up */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }} 
-            animate={{ opacity: 1, scale: 1 }} 
-            transition={{ duration: 1.2 }} 
-            className="hidden lg:block relative"
-          >
+          {/* Desktop Image */}
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.2 }} className="hidden lg:block relative">
             <div className="absolute inset-0 bg-emerald-500/10 blur-[100px] rounded-full"></div>
             <div className="relative aspect-[4/5] rounded-[3rem] overflow-hidden border border-white/10 group shadow-2xl bg-slate-900/50 backdrop-blur-3xl">
                {!imgError ? (
@@ -259,8 +219,8 @@ const App = () => {
                  <div className="w-full h-full flex flex-col items-center justify-center text-emerald-500/10"><User size={160} strokeWidth={0.5} /></div>
                )}
                <div className="absolute bottom-10 left-10 z-20">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1">Lead Financial Partner</div>
-                  <div className="text-2xl font-black text-white">KUSHAL POUDEL</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1 text-left uppercase">Financial Partner</div>
+                  <div className="text-2xl font-black text-white uppercase tracking-tight text-left">KUSHAL POUDEL</div>
                </div>
                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60"></div>
             </div>
@@ -268,50 +228,17 @@ const App = () => {
         </div>
       </section>
 
-      {/* Roadmap Section */}
-      <section className="py-24 sm:py-40 px-6 sm:px-8 max-w-[1400px] mx-auto text-left">
-        <div className="bg-slate-900/40 border border-emerald-500/20 rounded-[2.5rem] sm:rounded-[3rem] p-8 md:p-16 grid lg:grid-cols-[1fr_2fr] gap-12 lg:gap-16 shadow-inner relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none"><BrainCircuit size={300} className="text-emerald-500" /></div>
-          <div className="relative z-10">
-            <h2 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.5em] mb-4">Collaborative Planning</h2>
-            <h3 className="text-3xl sm:text-5xl font-black mb-8 italic">✨ Your Growth Path.</h3>
-            <p className="text-slate-400 mb-10 font-light italic leading-relaxed">Tell me what you're working toward, and we'll outline a supportive path forward.</p>
-            <div className="flex flex-col gap-4">
-               <input type="text" placeholder="What are you building?" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 outline-none focus:border-emerald-500 transition-all text-white placeholder:text-gray-600" value={roadmapGoal} onChange={(e) => setRoadmapGoal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && generateRoadmapAction()} />
-               <button onClick={generateRoadmapAction} className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl hover:bg-emerald-500 shadow-xl flex items-center justify-center gap-3 active:scale-[0.98] transition-all">
-                 {isRoadmapLoading ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />} Plan My Journey
-               </button>
-            </div>
-          </div>
-          <div className="bg-black/40 rounded-3xl border border-white/5 p-8 flex items-center justify-center min-h-[350px] relative shadow-2xl">
-            {generatedRoadmap ? (
-              <div className="w-full space-y-8">
-                {Object.values(generatedRoadmap).map((s, i) => (
-                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} key={i} className="flex gap-6 sm:gap-8 items-start group">
-                    <div className="text-4xl sm:text-5xl font-black text-emerald-950 italic group-hover:text-emerald-500/20 transition-all leading-none select-none">{i+1}</div>
-                    <div>
-                      <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Phase {i+1}</div>
-                      <p className="text-slate-200 text-base sm:text-lg font-light leading-relaxed">{s}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : <div className="text-slate-700 uppercase tracking-widest font-black text-xs sm:text-sm italic opacity-30 text-center">Your strategy will appear here...</div>}
-          </div>
-        </div>
-      </section>
-
       {/* Services Grid */}
-      <section className="py-24 sm:py-40 px-6 sm:px-8 max-w-[1400px] mx-auto text-center">
-        <h2 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.5em] mb-20">Strategic Support Framework</h2>
+      <section className="py-24 sm:py-40 px-6 sm:px-8 max-w-[1400px] mx-auto text-center border-t border-white/5">
+        <h2 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.5em] mb-20">Support Framework</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {[
             { icon: Users, title: "Taxation Partner", d: "I handle the complex codes so you can focus on building your legacy." },
-            { icon: ShieldCheck, title: "Security & Audit", d: "Providing total transparency so you can sleep soundly knowing your records are perfect." },
-            { icon: Receipt, title: "Precision Payroll", d: "Handling your team's happiness through precise, caring administration." },
+            { icon: ShieldCheck, title: "Security & Audit", d: "Providing total transparency so you can sleep soundly." },
+            { icon: Receipt, title: "Precision Payroll", d: "Handling your team's happiness through precise administration." },
             { icon: TrendingUp, title: "Asset Protection", d: "Turning volatility into a steady, secure path forward." },
-            { icon: Briefcase, title: "Business Consultant", d: "Consider me your in-house advocate, ready to help you grow with confidence." },
-            { icon: Landmark, title: "Firm Management", d: "Handling the documentation so you can focus on the parts of your work you love." }
+            { icon: Briefcase, title: "Business Consultant", d: "Your in-house advocate, ready to help you grow with confidence." },
+            { icon: Landmark, title: "Firm Management", d: "Handling the documentation so you can focus on your passion." }
           ].map((skill, i) => (
             <div key={i} className="p-10 rounded-[2.5rem] bg-slate-900/40 border border-white/5 text-left group hover:border-emerald-500/50 transition-all hover:bg-slate-900/60 shadow-xl">
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-8 group-hover:bg-emerald-500 group-hover:text-black transition-all"><skill.icon size={24} /></div>
@@ -322,7 +249,7 @@ const App = () => {
         </div>
       </section>
 
-      {/* Modern Footer CTA */}
+      {/* Footer CTA */}
       <footer className="py-24 sm:py-40 px-6 sm:px-8 max-w-[1400px] mx-auto text-center">
         <div className="rounded-[3rem] sm:rounded-[4rem] bg-emerald-700 p-12 sm:p-24 md:p-32 relative overflow-hidden shadow-2xl">
           <div className="absolute top-0 right-0 p-20 opacity-10 rotate-12 text-white pointer-events-none select-none"><ShieldCheck size={500} /></div>
@@ -336,7 +263,7 @@ const App = () => {
         </div>
         <div className="mt-24 pt-10 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-10 text-[10px] font-black text-slate-500 uppercase tracking-widest italic">
            <div>© 2024 KUSHAL POUDEL • BUILT FOR PEACE OF MIND</div>
-           <div className="flex gap-10">
+           <div className="flex gap-10 text-xs font-bold uppercase tracking-widest">
              <a href="#" className="hover:text-white transition-colors">LinkedIn</a>
              <a href="mailto:mail@kushalpoudel.com" className="hover:text-white transition-colors">Direct Mail</a>
            </div>
