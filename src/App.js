@@ -204,9 +204,9 @@ const App = () => {
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 px-6 sm:px-8 min-h-screen flex flex-col justify-center z-10 max-w-[1400px] mx-auto text-left">
-        <div className="max-w-5xl">
+        <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-12 items-center">
           <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 1 }}>
-            <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-[10px] font-black uppercase tracking-[0.3em] mb-12 shadow-sm">
+            <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-[10px] font-black uppercase tracking-[0.3em] mb-10 shadow-sm">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> Partnered for success
             </div>
             <h1 className="text-5xl sm:text-7xl md:text-[8rem] lg:text-[10rem] font-black tracking-tighter leading-[0.9] mb-8 uppercase text-white">
@@ -214,32 +214,20 @@ const App = () => {
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-amber-500 to-yellow-600 italic">MY PRIORITY.</span>
             </h1>
 
-            {/* Profile Image - Moved below main heading and made visible on mobile */}
+            {/* Mobile/Tablet Image - Visible only below Desktop break (lg) */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }} 
               animate={{ opacity: 1, y: 0 }} 
               transition={{ duration: 1, delay: 0.5 }} 
-              className="mb-12 relative w-full max-w-[500px]"
+              className="lg:hidden mb-10 relative w-full"
             >
               <div className="absolute inset-0 bg-emerald-500/10 blur-[60px] rounded-full"></div>
-              <div className="relative aspect-[4/3] sm:aspect-[16/9] lg:aspect-[21/9] rounded-[2rem] overflow-hidden border border-white/10 group shadow-2xl bg-slate-900/50 backdrop-blur-3xl">
+              <div className="relative aspect-[16/9] rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl bg-slate-900/50 backdrop-blur-3xl">
                  {!imgError ? (
-                   <img 
-                     src="/profile.jpg" 
-                     alt="Kushal Poudel" 
-                     className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" 
-                     onError={() => setImgError(true)}
-                   />
+                   <img src="/profile.jpg" alt="Kushal Poudel" className="w-full h-full object-cover grayscale transition-all duration-700" onError={() => setImgError(true)} />
                  ) : (
-                   <div className="w-full h-full flex flex-col items-center justify-center text-emerald-500/10">
-                      <User size={80} strokeWidth={0.5} />
-                      <div className="text-[8px] font-black uppercase tracking-[0.4em] mt-4 opacity-40 text-center px-4">Professional Photo Uploaded</div>
-                   </div>
+                   <div className="w-full h-full flex flex-col items-center justify-center text-emerald-500/10"><User size={80} strokeWidth={0.5} /></div>
                  )}
-                 <div className="absolute bottom-6 left-6 z-20">
-                    <div className="text-[8px] font-black uppercase tracking-widest text-emerald-500 mb-0.5">Financial Partner</div>
-                    <div className="text-lg font-black text-white">KUSHAL POUDEL</div>
-                 </div>
                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60"></div>
               </div>
             </motion.div>
@@ -253,6 +241,28 @@ const App = () => {
                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 group-hover:text-white">Listen to Message</span>
                </button>
                <a href="mailto:mail@kushalpoudel.com" className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center text-gray-400 hover:text-emerald-400 transition-all shadow-xl active:scale-95"><Mail size={24} /></a>
+            </div>
+          </motion.div>
+
+          {/* Desktop Image - Visible only on LG and up */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }} 
+            animate={{ opacity: 1, scale: 1 }} 
+            transition={{ duration: 1.2 }} 
+            className="hidden lg:block relative"
+          >
+            <div className="absolute inset-0 bg-emerald-500/10 blur-[100px] rounded-full"></div>
+            <div className="relative aspect-[4/5] rounded-[3rem] overflow-hidden border border-white/10 group shadow-2xl bg-slate-900/50 backdrop-blur-3xl">
+               {!imgError ? (
+                 <img src="/profile.jpg" alt="Kushal Poudel" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" onError={() => setImgError(true)} />
+               ) : (
+                 <div className="w-full h-full flex flex-col items-center justify-center text-emerald-500/10"><User size={160} strokeWidth={0.5} /></div>
+               )}
+               <div className="absolute bottom-10 left-10 z-20">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-1">Lead Financial Partner</div>
+                  <div className="text-2xl font-black text-white">KUSHAL POUDEL</div>
+               </div>
+               <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60"></div>
             </div>
           </motion.div>
         </div>
