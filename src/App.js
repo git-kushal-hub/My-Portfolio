@@ -33,6 +33,10 @@ const App = () => {
   });
 
   useEffect(() => {
+    // Force dark color scheme for the entire document to prevent browser overrides
+    document.documentElement.style.colorScheme = 'dark';
+    document.body.style.backgroundColor = '#050505';
+
     const handleMouseMove = (e) => setMousePos({ x: e.clientX, y: e.clientY });
     const handleScroll = () => setScrolled(window.scrollY > 50);
     const handleKeyDown = (e) => {
@@ -78,7 +82,7 @@ const App = () => {
   ];
 
   return (
-    <div className="bg-[#050505] text-white min-h-screen font-sans selection:bg-indigo-500/30 overflow-x-hidden">
+    <div className="bg-[#050505] text-white min-h-screen font-sans selection:bg-indigo-500/30 overflow-x-hidden" style={{ colorScheme: 'dark' }}>
       {/* Progress Bar */}
       <motion.div className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-purple-500 origin-left z-[110]" style={{ scaleX }} />
 
@@ -87,7 +91,7 @@ const App = () => {
         {isCommandOpen && (
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md"
             onClick={() => setIsCommandOpen(false)}
           >
             <motion.div 
@@ -97,8 +101,8 @@ const App = () => {
             >
               <div className="flex items-center gap-4 p-6 border-b border-white/5">
                 <Search className="text-gray-500" size={24} />
-                <input autoFocus placeholder="Search protocols, projects, or docs..." className="bg-transparent w-full outline-none text-xl placeholder:text-gray-700" />
-                <button onClick={() => setIsCommandOpen(false)} className="p-2 hover:bg-white/5 rounded-xl"><X size={20} /></button>
+                <input autoFocus placeholder="Search protocols, projects, or docs..." className="bg-transparent w-full outline-none text-xl text-white placeholder:text-gray-700" />
+                <button onClick={() => setIsCommandOpen(false)} className="p-2 hover:bg-white/5 rounded-xl text-white"><X size={20} /></button>
               </div>
               <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-2">
                 {[
@@ -132,7 +136,7 @@ const App = () => {
 
       {/* Header */}
       <nav className={`fixed w-full z-[100] transition-all duration-700 ${scrolled ? 'py-4 bg-black/80 backdrop-blur-2xl border-b border-white/5' : 'py-10 bg-transparent'}`}>
-        <div className="max-w-[1400px] mx-auto px-8 flex justify-between items-center">
+        <div className="max-w-[1400px] mx-auto px-8 flex justify-between items-center text-white">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-2xl font-black tracking-tighter flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.4)]"><Terminal size={20} /></div>
             <span className="hidden sm:inline">KUSHAL<span className="text-indigo-500">.</span>POUDEL</span>
@@ -163,7 +167,7 @@ const App = () => {
             <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></div> Available for 2024 collaborations
           </div>
           
-          <h1 className="text-7xl md:text-[10rem] lg:text-[13rem] font-black tracking-tighter leading-[0.8] mb-12">
+          <h1 className="text-7xl md:text-[10rem] lg:text-[13rem] font-black tracking-tighter leading-[0.8] mb-12 text-white">
             BUILDING <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500">DIGITAL SOULS.</span>
           </h1>
@@ -192,7 +196,7 @@ const App = () => {
           ].map((s, i) => (
             <motion.div key={i} whileHover={{ y: -5 }}>
               <s.icon className="text-indigo-500 mb-6" size={24} />
-              <div className="text-6xl font-black tracking-tighter mb-2">{s.val}</div>
+              <div className="text-6xl font-black tracking-tighter mb-2 text-white">{s.val}</div>
               <div className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-600">{s.label}</div>
             </motion.div>
           ))}
@@ -202,7 +206,7 @@ const App = () => {
       {/* Projects Grid */}
       <section id="work" className="py-40 px-8 max-w-[1400px] mx-auto">
         <div className="flex justify-between items-end mb-32">
-          <h2 className="text-5xl md:text-8xl font-black tracking-tighter">SELECTED <br />PROTOCOLS.</h2>
+          <h2 className="text-5xl md:text-8xl font-black tracking-tighter text-white">SELECTED <br />PROTOCOLS.</h2>
           <div className="hidden md:block text-right">
             <div className="text-gray-500 uppercase tracking-widest text-[10px] font-black mb-2">Portfolio Volume</div>
             <div className="text-4xl font-black tabular-nums text-indigo-500">03 / 12</div>
@@ -223,11 +227,11 @@ const App = () => {
                   <div className="flex flex-wrap gap-2">
                     {p.tech.map(t => <span key={t} className="px-4 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 backdrop-blur-md">{t}</span>)}
                   </div>
-                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-indigo-600 transition-all duration-500"><ArrowUpRight size={24} /></div>
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10 group-hover:bg-indigo-600 transition-all duration-500 text-white"><ArrowUpRight size={24} /></div>
                 </div>
 
                 <div className="relative z-10 transform group-hover:translate-y-[-10px] transition-transform duration-500">
-                  <h4 className="text-5xl md:text-7xl font-black mb-6 tracking-tighter leading-none">{p.title}</h4>
+                  <h4 className="text-5xl md:text-7xl font-black mb-6 tracking-tighter leading-none text-white">{p.title}</h4>
                   <p className="text-gray-500 text-lg md:text-xl font-light max-w-sm mb-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500">{p.desc}</p>
                   <button className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-500">Analyze System Details</button>
                 </div>
@@ -240,9 +244,9 @@ const App = () => {
       {/* Footer CTA */}
       <footer id="contact" className="pt-20 pb-20 px-8 max-w-[1400px] mx-auto">
         <div className="rounded-[4rem] bg-indigo-600 p-16 md:p-32 text-center relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-20 opacity-10 rotate-12"><Sparkles size={400} /></div>
+          <div className="absolute top-0 right-0 p-20 opacity-10 rotate-12 text-white"><Sparkles size={400} /></div>
           
-          <h2 className="text-6xl md:text-9xl font-black tracking-tighter mb-12 relative z-10">DON'T SETTLE <br />FOR AVERAGE.</h2>
+          <h2 className="text-6xl md:text-9xl font-black tracking-tighter mb-12 relative z-10 text-white">DON'T SETTLE <br />FOR AVERAGE.</h2>
           <p className="text-indigo-100 text-xl md:text-3xl font-light mb-16 max-w-3xl mx-auto leading-relaxed relative z-10">
             Secure your slot for the next development cycle. Let's build something that leaves the competition in the rearview.
           </p>
@@ -262,7 +266,7 @@ const App = () => {
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
             Core Network Status: Optimal
           </div>
-          <div className="text-center">© 2024 KUSHAL POUDEL — ARCHITECTED FOR PERMANENCE</div>
+          <div className="text-center text-gray-500 font-bold uppercase tracking-widest">© 2024 KUSHAL POUDEL — ARCHITECTED FOR PERMANENCE</div>
           <div className="flex gap-10">
             <a href="#" className="hover:text-white transition-all">GitHub</a>
             <a href="#" className="hover:text-white transition-all">LinkedIn</a>
