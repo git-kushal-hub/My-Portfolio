@@ -7,6 +7,12 @@ import {
   BrainCircuit, Loader2, Coffee, Users, User 
 } from 'lucide-react';
 
+// --- Configuration ---
+// The execution environment provides the key at runtime for the direct fallback.
+const apiKey = ""; 
+const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
+const TTS_MODEL = "gemini-2.5-flash-preview-tts";
+
 const App = () => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [scrolled, setScrolled] = useState(false);
@@ -22,6 +28,17 @@ const App = () => {
 
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
+
+  const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+
+  // Helper to check if relative /api paths are safe to fetch (avoids blob URL errors)
+  const canUseProxy = () => {
+    try {
+      return window.location.protocol.startsWith('http') && window.location.hostname !== '';
+    } catch (e) {
+      return false;
+    }
+  };
 
   // PCM to WAV conversion helper
   const createWavUrl = (base64Pcm, sampleRate = 24000) => {
@@ -48,19 +65,87 @@ const App = () => {
     return URL.createObjectURL(blob);
   };
 
+  // Hybrid AI Fetcher: Tries Proxy first, then Direct API
+  const fetchAiContent = async (payload, isJson = false) => {
+    // 1. Attempt Proxy (Production Environment)
+    if (canUseProxy()) {
+      try {
+        const proxyResponse = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, isJson })
+        });
+
+        if (proxyResponse.ok) {
+          const data = await proxyResponse.json();
+          return data.text;
+        }
+      } catch (e) {
+        console.warn("Proxy fetch failed or not available, falling back to direct API.");
+      }
+    }
+    
+    // 2. Fallback to Direct API (Preview/Local Environment)
+    const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${apiKey}`;
+    const directResponse = await fetch(directUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: payload.prompt }] }],
+        systemInstruction: { parts: [{ text: payload.systemInstruction }] },
+        ...(isJson && { generationConfig: { responseMimeType: "application/json" } })
+      })
+    });
+
+    if (!directResponse.ok) throw new Error("Direct API failed");
+    const directData = await directResponse.json();
+    return directData.candidates?.[0]?.content?.parts?.[0]?.text;
+  };
+
   const handleTts = async (textToSpeak) => {
     if (isTtsLoading) return;
     setIsTtsLoading(true);
     try {
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textToSpeak })
-      });
-      const data = await response.json();
-      if (data.audio) {
-        const audio = new Audio(createWavUrl(data.audio));
-        audio.play();
+      let audioData = null;
+
+      // Try Proxy first if environment allows
+      if (canUseProxy()) {
+        try {
+          const response = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: textToSpeak })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            audioData = data.audio;
+          }
+        } catch (e) {
+          console.warn("TTS Proxy failed, using direct API.");
+        }
+      }
+      
+      if (!audioData) {
+        // Direct Fallback
+        const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`;
+        const directRes = await fetch(directUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `Say clearly: ${textToSpeak}` }] }],
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
+            }
+          })
+        });
+        const data = await directRes.json();
+        audioData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      }
+
+      if (audioData) {
+        new Audio(createWavUrl(audioData)).play();
       }
     } catch (e) {
       console.error(e);
@@ -73,19 +158,19 @@ const App = () => {
     if (!roadmapGoal || isRoadmapLoading) return;
     setIsRoadmapLoading(true);
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt: `Goal: ${roadmapGoal}`, 
-          systemInstruction: "You are Kushal Poudel. Generate a 4-step financial roadmap in JSON format with properties step1, step2, step3, step4.",
-          isJson: true 
-        })
-      });
-      const data = await response.json();
-      setGeneratedRoadmap(JSON.parse(data.text));
+      const payload = {
+        prompt: `Goal: ${roadmapGoal}`,
+        systemInstruction: "You are Kushal Poudel. Generate a supportive 4-step financial roadmap. JSON only: step1, step2, step3, step4."
+      };
+      const text = await fetchAiContent(payload, true);
+      setGeneratedRoadmap(JSON.parse(text));
     } catch (e) {
-      setGeneratedRoadmap({ step1: "Strategist offline.", step2: "I'd love to help personally.", step3: "Email: mail@kushalpoudel.com", step4: "Let's build your path." });
+      setGeneratedRoadmap({ 
+        step1: "Connection issue.", 
+        step2: "I'd love to help personally.", 
+        step3: "Email: mail@kushalpoudel.com", 
+        step4: "Let's build your path." 
+      });
     } finally { setIsRoadmapLoading(false); }
   };
 
@@ -93,18 +178,14 @@ const App = () => {
     if (!aiQuery || isAiLoading) return;
     setIsAiLoading(true);
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt: aiQuery, 
-          systemInstruction: "You are Kushal Poudel, a financial partner. Respond warmly and concisely." 
-        })
-      });
-      const data = await response.json();
-      setAiResponse(data.text);
+      const payload = {
+        prompt: aiQuery,
+        systemInstruction: "You are Kushal Poudel, a financial partner. Respond warmly and concisely."
+      };
+      const text = await fetchAiContent(payload);
+      setAiResponse(text);
     } catch (e) {
-      setAiResponse("Connection issue. Let's chat: mail@kushalpoudel.com");
+      setAiResponse("I'm having trouble with the connection. Please reach out to me directly at mail@kushalpoudel.com!");
     } finally { setIsAiLoading(false); }
   };
 
@@ -130,6 +211,7 @@ const App = () => {
     <div className="bg-[#020617] text-white min-h-screen font-sans selection:bg-emerald-500/30 overflow-x-hidden">
       <motion.div className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-amber-500 to-emerald-600 origin-left z-[110]" style={{ scaleX }} />
 
+      {/* Command K Chat Modal */}
       <AnimatePresence>
         {isCommandOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md" onClick={() => setIsCommandOpen(false)}>
@@ -147,10 +229,10 @@ const App = () => {
                     {aiResponse}
                   </motion.div>
                 ) : (
-                  <div className="flex flex-col gap-4 opacity-20">
+                  <div className="flex flex-col gap-4 opacity-20 text-center items-center py-10">
                     <div className="h-4 w-3/4 bg-white/10 rounded"></div>
                     <div className="h-4 w-1/2 bg-white/10 rounded"></div>
-                    <div className="mt-8 text-[10px] font-black uppercase tracking-[0.5em] text-center w-full italic text-white/50 text-center">Fiscal Command Center</div>
+                    <div className="mt-8 text-[10px] font-black uppercase tracking-[0.5em] text-white/50">Fiscal Command Center</div>
                   </div>
                 )}
               </div>
@@ -161,6 +243,7 @@ const App = () => {
 
       <div className="pointer-events-none fixed inset-0 z-30 opacity-30" style={{ background: `radial-gradient(1000px at ${mousePos.x}px ${mousePos.y}px, rgba(16, 185, 129, 0.08), transparent 80%)` }} />
       
+      {/* Navigation */}
       <nav className={`fixed w-full z-[100] transition-all duration-700 ${scrolled ? 'py-4 bg-slate-950/90 backdrop-blur-2xl border-b border-white/5 shadow-2xl' : 'py-10'}`}>
         <div className="max-w-[1400px] mx-auto px-6 sm:px-8 flex justify-between items-center">
           <div className="text-xl sm:text-2xl font-black tracking-tighter flex items-center gap-3">
@@ -173,6 +256,7 @@ const App = () => {
         </div>
       </nav>
 
+      {/* Hero Section */}
       <section className="relative pt-32 pb-20 px-6 sm:px-8 min-h-screen flex flex-col justify-center z-10 max-w-[1400px] mx-auto text-left">
         <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-12 items-center">
           <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 1 }}>
@@ -225,6 +309,39 @@ const App = () => {
                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60"></div>
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Collaborative Roadmap Section */}
+      <section className="py-24 sm:py-40 px-6 sm:px-8 max-w-[1400px] mx-auto text-left border-t border-white/5">
+        <div className="bg-slate-900/40 border border-emerald-500/20 rounded-[2.5rem] sm:rounded-[3rem] p-8 md:p-16 grid lg:grid-cols-[1fr_2fr] gap-12 lg:gap-16 shadow-inner relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none"><BrainCircuit size={300} className="text-emerald-500" /></div>
+          <div className="relative z-10">
+            <h2 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.5em] mb-4">Collaborative Planning</h2>
+            <h3 className="text-3xl sm:text-5xl font-black mb-8 italic">✨ Your Growth Path.</h3>
+            <p className="text-slate-400 mb-10 font-light italic leading-relaxed">Tell me what you're working toward, and we'll outline a supportive path forward.</p>
+            <div className="flex flex-col gap-4">
+               <input type="text" placeholder="What are you building?" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 outline-none focus:border-emerald-500 transition-all text-white placeholder:text-gray-600" value={roadmapGoal} onChange={(e) => setRoadmapGoal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && generateRoadmapAction()} />
+               <button onClick={generateRoadmapAction} className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl hover:bg-emerald-500 shadow-xl flex items-center justify-center gap-3 active:scale-[0.98] transition-all">
+                 {isRoadmapLoading ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />} Plan My Journey
+               </button>
+            </div>
+          </div>
+          <div className="bg-black/40 rounded-3xl border border-white/5 p-8 flex items-center justify-center min-h-[350px] relative shadow-2xl">
+            {generatedRoadmap ? (
+              <div className="w-full space-y-8 text-left">
+                {Object.values(generatedRoadmap).map((s, i) => (
+                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} key={i} className="flex gap-6 sm:gap-8 items-start group">
+                    <div className="text-4xl sm:text-5xl font-black text-emerald-950 italic group-hover:text-emerald-500/20 transition-all leading-none select-none">{i+1}</div>
+                    <div>
+                      <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Phase {i+1}</div>
+                      <p className="text-slate-200 text-base sm:text-lg font-light leading-relaxed">{s}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : <div className="text-slate-700 uppercase tracking-widest font-black text-xs sm:text-sm italic opacity-30 text-center">Your strategy will appear here...</div>}
+          </div>
         </div>
       </section>
 
