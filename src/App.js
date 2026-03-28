@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useScroll, useSpring } from 'framer-motion';
-import { 
+import {
   Mail, Briefcase, TrendingUp, ShieldCheck,
-  Sparkles, Search,
-  Zap, Landmark, Receipt, Volume2, 
+  Sparkles, Search, Zap, Landmark, Receipt, Volume2,
   BrainCircuit, Loader2, Users, User, BookOpen
 } from 'lucide-react';
 
