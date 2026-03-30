@@ -1,65 +1,52 @@
-/**
- * Vercel Serverless Function: Chat Proxy
- * This runs on the server side, keeping your API key 100% hidden from the browser.
- */
 export default async function handler(req, res) {
-  // Only allow POST requests from your frontend
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { prompt, systemInstruction, isJson } = req.body;
-  
-  // This pulls the secret key you just updated in the Vercel Dashboard
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    console.error("Vercel Configuration Error: GEMINI_API_KEY is missing.");
-    return res.status(500).json({ error: 'API key not configured on server. Please check your Vercel Environment Variables.' });
+    return res.status(500).json({ error: 'API key not configured on server.' });
   }
 
   try {
-    // Model used: gemini-2.0-flash
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-    
-    const response = await fetch(url, {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        contents: [{ 
-          parts: [{ text: prompt }] 
-        }],
-        systemInstruction: { 
-          parts: [{ text: systemInstruction }] 
-        },
-        generationConfig: {
-          ...(isJson ? { responseMimeType: "application/json" } : {})
-        }
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: systemInstruction || 'You are Kushal Poudel, a financial partner. Respond warmly and concisely.',
+        messages: [{ role: 'user', content: prompt }]
       })
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error("Google API Error Response:", JSON.stringify(errorData));
-      return res.status(response.status).json({ 
-        error: "The AI service returned an error.", 
-        details: errorData.error?.message || "Unknown error" 
-      });
+      console.error('Anthropic API Error:', JSON.stringify(errorData));
+      return res.status(response.status).json({ error: 'AI service error.', details: errorData });
     }
 
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!text) {
-      throw new Error("The AI model returned an empty response.");
+    const text = data.content?.[0]?.text;
+
+    if (!text) throw new Error('Empty response from AI.');
+
+    // If JSON was requested, validate it parses cleanly
+    if (isJson) {
+      const clean = text.replace(/```json|```/g, '').trim();
+      JSON.parse(clean); // will throw if invalid
+      return res.status(200).json({ text: clean });
     }
 
-    // Success: return the text to your portfolio frontend
     return res.status(200).json({ text });
   } catch (error) {
-    console.error("Backend Proxy Exception:", error);
-    return res.status(500).json({ error: "Internal server error connecting to AI." });
+    console.error('Backend error:', error);
+    return res.status(500).json({ error: 'Internal server error.' });
   }
 }
