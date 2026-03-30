@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useScroll, useSpring } from 'framer-motion';
-import {
+import { 
   Mail, Briefcase, TrendingUp, ShieldCheck,
-  Sparkles, Search, Zap, Landmark, Receipt, Volume2,
+  Sparkles, Search,
+  Zap, Landmark, Receipt, Volume2, 
   BrainCircuit, Loader2, Users, User, BookOpen
 } from 'lucide-react';
 
 // --- Configuration ---
 // The execution environment provides the key at runtime for the direct fallback.
 const apiKey = ""; 
-const TEXT_MODEL = "gemini-2.5-flash-preview-09-2025";
+const TEXT_MODEL = "gemini-2.0-flash";
 const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
 const App = () => {
