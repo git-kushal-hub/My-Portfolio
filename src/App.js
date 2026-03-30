@@ -11,7 +11,6 @@ import {
 // The execution environment provides the key at runtime for the direct fallback.
 const apiKey = ""; 
 const TEXT_MODEL = "gemini-2.0-flash";
-const TTS_MODEL = "gemini-2.5-flash-preview-tts";
 
 const App = () => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -112,56 +111,22 @@ const App = () => {
     return directData.candidates?.[0]?.content?.parts?.[0]?.text;
   };
 
-  const handleTts = async (textToSpeak) => {
+  const handleTts = (textToSpeak) => {
     if (isTtsLoading) return;
+    if (!window.speechSynthesis) return;
     setIsTtsLoading(true);
-    try {
-      let audioData = null;
-
-      // Try Proxy first if environment allows
-      if (canUseProxy()) {
-        try {
-          const response = await fetch('/api/tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: textToSpeak })
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            audioData = data.audio;
-          }
-        } catch (e) {
-          console.warn("TTS Proxy failed, using direct API.");
-        }
-      }
-      
-      if (!audioData) {
-        // Direct Fallback
-        const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`;
-        const directRes = await fetch(directUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `Say clearly: ${textToSpeak}` }] }],
-            generationConfig: {
-              responseModalities: ["AUDIO"],
-              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
-            }
-          })
-        });
-        const data = await directRes.json();
-        audioData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      }
-
-      if (audioData) {
-        new Audio(createWavUrl(audioData)).play();
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsTtsLoading(false);
-    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    // Pick a good voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v => v.name.includes('Google') && v.lang === 'en-US') || voices.find(v => v.lang === 'en-US') || voices[0];
+    if (preferred) utterance.voice = preferred;
+    utterance.onend = () => setIsTtsLoading(false);
+    utterance.onerror = () => setIsTtsLoading(false);
+    window.speechSynthesis.speak(utterance);
   };
 
   const generateRoadmapAction = async () => {
