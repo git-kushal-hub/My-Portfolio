@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, Edit3, Save, X, Lock, LogOut, Landmark, Eye, FileText } from 'lucide-react';
 
-const ADMIN_PASSWORD = 'kushal2024';
+const ADMIN_PASSWORD = 'Blog#mine9';
 
 const TAGS = ['Taxation', 'Investing', 'Personal Finance', 'Business', 'Planning'];
 
